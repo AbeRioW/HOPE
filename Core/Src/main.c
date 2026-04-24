@@ -43,10 +43,20 @@
 
 /* USER CODE END PM */
 
-/* Private variables ---------------------------------------------------------*/
+/* Private variables ---------------------------------------------------------
+*/
 /* USER CODE BEGIN PV */
 DHT11_Data_t dht11_data;
 char uart_buf[100];
+uint16_t LIGHT_THRESHOLD = 3000;
+uint16_t SOIL_THRESHOLD = 3000;
+
+/* UART receive buffer */
+#define UART_BUF_SIZE 20
+char uart_rx_buf[UART_BUF_SIZE];
+uint8_t uart_rx_index = 0;
+
+
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -57,6 +67,67 @@ void SystemClock_Config(void);
 
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
+#include "stm32f1xx_hal_flash.h"
+
+/* Flash memory addresses for threshold storage */
+#define FLASH_LIGHT_THRESHOLD_ADDR  0x08007C00  /* Last 1KB of 64KB flash */
+#define FLASH_SOIL_THRESHOLD_ADDR   0x08007C02
+
+/* Flash unlock and lock functions */
+void Flash_Unlock(void) {
+    HAL_FLASH_Unlock();
+}
+
+void Flash_Lock(void) {
+    HAL_FLASH_Lock();
+}
+
+/* Write 16-bit value to Flash */
+HAL_StatusTypeDef Flash_Write16(uint32_t address, uint16_t value) {
+    Flash_Unlock();
+    
+    /* Erase the sector first if needed */
+    FLASH_EraseInitTypeDef eraseInit;
+    eraseInit.TypeErase = FLASH_TYPEERASE_PAGES;
+    eraseInit.PageAddress = FLASH_LIGHT_THRESHOLD_ADDR;
+    eraseInit.NbPages = 1;
+    
+    uint32_t error = 0;
+    HAL_FLASHEx_Erase(&eraseInit, &error);
+    
+    if (error != 0) {
+        Flash_Lock();
+        return HAL_ERROR;
+    }
+    
+    /* Program the value */
+    HAL_StatusTypeDef status = HAL_FLASH_Program(FLASH_TYPEPROGRAM_HALFWORD, address, value);
+    Flash_Lock();
+    return status;
+}
+
+/* Read 16-bit value from Flash */
+uint16_t Flash_Read16(uint32_t address) {
+    return *((uint16_t*)address);
+}
+
+/* Process UART command */
+void ProcessUARTCommand(char* cmd) {
+    uint16_t value = 0;
+    
+    if (sscanf(cmd, "ADC1:%hu", &value) == 1) {
+        LIGHT_THRESHOLD = value;
+        Flash_Write16(FLASH_LIGHT_THRESHOLD_ADDR, value);
+        snprintf(uart_buf, sizeof(uart_buf), "Light threshold set to %u\r\n", value);
+        HAL_UART_Transmit(&huart2, (uint8_t*)uart_buf, strlen(uart_buf), 500);
+    }
+    else if (sscanf(cmd, "ADC2:%hu", &value) == 1) {
+        SOIL_THRESHOLD = value;
+        Flash_Write16(FLASH_SOIL_THRESHOLD_ADDR, value);
+        snprintf(uart_buf, sizeof(uart_buf), "Soil threshold set to %u\r\n", value);
+        HAL_UART_Transmit(&huart2, (uint8_t*)uart_buf, strlen(uart_buf), 500);
+    }
+}
 
 /* USER CODE END 0 */
 
@@ -93,10 +164,30 @@ int main(void)
   MX_ADC2_Init();
   MX_USART2_UART_Init();
   /* USER CODE BEGIN 2 */
+	  /*Configure GPIO pin Output Level */
+  HAL_GPIO_WritePin(LED_GPIO_Port, LED_Pin, GPIO_PIN_RESET);
+
+  /*Configure GPIO pin Output Level */
+  HAL_GPIO_WritePin(LAY_GPIO_Port, LAY_Pin, GPIO_PIN_RESET);
   HAL_ADCEx_Calibration_Start(&hadc1);
   HAL_ADCEx_Calibration_Start(&hadc2);
 
-  snprintf(uart_buf, sizeof(uart_buf), "System Initialized\r\n");
+  /* Read thresholds from Flash */
+  uint16_t saved_light = Flash_Read16(FLASH_LIGHT_THRESHOLD_ADDR);
+  uint16_t saved_soil = Flash_Read16(FLASH_SOIL_THRESHOLD_ADDR);
+  
+  if (saved_light != 0xFFFF) {  /* Check if Flash has valid data */
+      LIGHT_THRESHOLD = saved_light;
+  }
+  if (saved_soil != 0xFFFF) {
+      SOIL_THRESHOLD = saved_soil;
+  }
+
+  /* Enable UART receive interrupt */
+  HAL_UART_Receive_IT(&huart2, (uint8_t*)uart_rx_buf, 1);
+
+  snprintf(uart_buf, sizeof(uart_buf), "System Initialized\r\nLight threshold: %u\r\nSoil threshold: %u\r\n", 
+           LIGHT_THRESHOLD, SOIL_THRESHOLD);
   HAL_UART_Transmit(&huart2, (uint8_t *)uart_buf, strlen(uart_buf), 500);
   /* USER CODE END 2 */
 
@@ -106,6 +197,18 @@ int main(void)
   {
     uint32_t adc1_value = ADC1_Read();
     uint32_t adc2_value = ADC2_Read();
+
+    if (adc1_value > LIGHT_THRESHOLD) {
+        HAL_GPIO_WritePin(LED_GPIO_Port, LED_Pin, GPIO_PIN_SET);
+    } else {
+        HAL_GPIO_WritePin(LED_GPIO_Port, LED_Pin, GPIO_PIN_RESET);
+    }
+
+    if (adc2_value > SOIL_THRESHOLD) {
+        HAL_GPIO_WritePin(LAY_GPIO_Port, LAY_Pin, GPIO_PIN_SET);
+    } else {
+        HAL_GPIO_WritePin(LAY_GPIO_Port, LAY_Pin, GPIO_PIN_RESET);
+    }
 
     uint8_t dht_status = DHT11_READ_DATA(&dht11_data);
 
@@ -123,7 +226,7 @@ int main(void)
 
     uint16_t len = strlen(uart_buf);
     HAL_UART_Transmit(&huart2, (uint8_t *)uart_buf, len, 500);
-    HAL_Delay(2000);
+    HAL_Delay(5000);
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
@@ -178,6 +281,43 @@ void SystemClock_Config(void)
 }
 
 /* USER CODE BEGIN 4 */
+
+/**
+  * @brief  UART receive completed callback
+  * @param  huart: UART handle
+  * @retval None
+  */
+void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart) {
+    if (huart->Instance == USART2) {
+        /* Process received character */
+        if (uart_rx_buf[uart_rx_index] == '\r' || uart_rx_buf[uart_rx_index] == '\n') {
+            /* Command complete, process it */
+            if (uart_rx_index > 0) {
+                uart_rx_buf[uart_rx_index] = '\0';  /* Null-terminate */
+                
+                /* Check for Bluetooth connection status messages */
+                if (strcmp(uart_rx_buf, "CONNECT OK") == 0 || strcmp(uart_rx_buf, "DISCONNECT") == 0) {
+                    /* Clear buffer and do nothing */
+                    uart_rx_index = 0;
+                } else {
+                    /* Process other commands */
+                    ProcessUARTCommand(uart_rx_buf);
+                    uart_rx_index = 0;  /* Reset buffer */
+                }
+            } else {
+                uart_rx_index = 0;  /* Reset buffer */
+            }
+        } else {
+            /* Add character to buffer */
+            if (uart_rx_index < UART_BUF_SIZE - 1) {
+                uart_rx_index++;
+            }
+        }
+        
+        /* Restart receive interrupt */
+        HAL_UART_Receive_IT(&huart2, &uart_rx_buf[uart_rx_index], 1);
+    }
+}
 
 /* USER CODE END 4 */
 

@@ -21,7 +21,7 @@ Target DLL:      CMSIS_AGDI.dll V1.33.15.0
 Dialog DLL:      TCM.DLL V1.56.4.0
  
 <h2>Project:</h2>
-C:\Users\Admin\Desktop\hope\hope\MDK-ARM\hope.uvprojx
+C:\Users\Admin\Desktop\github0424_hope\HOPE\MDK-ARM\hope.uvprojx
 Project File Date:  04/24/2026
 
 <h2>Output:</h2>
@@ -30,13 +30,11 @@ Build target 'hope'
 compiling main.c...
 ../Core/Inc/dht11.h(31): warning:  #1-D: last line of file ends without a newline
   #endif
-../Core/Src/main.c: 1 warning, 0 errors
-compiling dht11.c...
-../Core/Inc/dht11.h(31): warning:  #1-D: last line of file ends without a newline
-  #endif
-..\Core\Src\dht11.c: 1 warning, 0 errors
+../Core/Src/main.c(318): warning:  #167-D: argument of type "char *" is incompatible with parameter of type "uint8_t *"
+          HAL_UART_Receive_IT(&huart2, &uart_rx_buf[uart_rx_index], 1);
+../Core/Src/main.c: 2 warnings, 0 errors
 linking...
-Program Size: Code=7164 RO-data=328 RW-data=24 ZI-data=1904  
+Program Size: Code=11288 RO-data=600 RW-data=28 ZI-data=1956  
 FromELF: creating hex file...
 "hope\hope.axf" - 0 Error(s), 2 Warning(s).
 
@@ -62,7 +60,7 @@ Package Vendor: Keil
 
    * Component: ARM::CMSIS:CORE:5.6.0
       Include file:  CMSIS/Core/Include/tz_context.h
-Build Time Elapsed:  00:00:02
+Build Time Elapsed:  00:00:01
 </pre>
 </body>
 </html>

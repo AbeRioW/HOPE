@@ -1,12 +1,12 @@
 --cpu Cortex-M3
 "hope\startup_stm32f103xb.o"
+"hope\dht11.o"
 "hope\main.o"
 "hope\gpio.o"
 "hope\adc.o"
 "hope\usart.o"
 "hope\stm32f1xx_it.o"
 "hope\stm32f1xx_hal_msp.o"
-"hope\dht11.o"
 "hope\stm32f1xx_hal_gpio_ex.o"
 "hope\stm32f1xx_hal_adc.o"
 "hope\stm32f1xx_hal_adc_ex.o"
