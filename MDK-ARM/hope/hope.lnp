@@ -1,0 +1,28 @@
+--cpu Cortex-M3
+"hope\startup_stm32f103xb.o"
+"hope\main.o"
+"hope\gpio.o"
+"hope\adc.o"
+"hope\usart.o"
+"hope\stm32f1xx_it.o"
+"hope\stm32f1xx_hal_msp.o"
+"hope\dht11.o"
+"hope\stm32f1xx_hal_gpio_ex.o"
+"hope\stm32f1xx_hal_adc.o"
+"hope\stm32f1xx_hal_adc_ex.o"
+"hope\stm32f1xx_hal.o"
+"hope\stm32f1xx_hal_rcc.o"
+"hope\stm32f1xx_hal_rcc_ex.o"
+"hope\stm32f1xx_hal_gpio.o"
+"hope\stm32f1xx_hal_dma.o"
+"hope\stm32f1xx_hal_cortex.o"
+"hope\stm32f1xx_hal_pwr.o"
+"hope\stm32f1xx_hal_flash.o"
+"hope\stm32f1xx_hal_flash_ex.o"
+"hope\stm32f1xx_hal_exti.o"
+"hope\stm32f1xx_hal_uart.o"
+"hope\system_stm32f1xx.o"
+--strict --scatter "hope\hope.sct"
+--summary_stderr --info summarysizes --map --load_addr_map_info --xref --callgraph --symbols
+--info sizes --info totals --info unused --info veneers
+--list "hope.map" -o hope\hope.axf
